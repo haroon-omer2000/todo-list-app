@@ -1,0 +1,83 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: devsinc123
+# "app" enables Serverless Framework Dashboard features and sharing them with other Services.
+app: todo-list-app
+# "service" is the name of this project. This will also be added to your AWS resource names.
+service: todo-list-app
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  stage: ${opt:stage, 'dev'} # Allows multi-stage deployments (dev, prod)
+  region: ${opt:region, 'us-east-1'}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - Fn::GetAtt: [ TodosTable, Arn ]
+  environment:
+    TODOS_TABLE: ${self:custom.tableName}
+
+custom:
+  tableName: todos-${self:provider.stage} # Stage-specific table names (e.g., todos-dev, todos-prod)
+
+functions:
+  createTodo:
+    handler: handler.createTodo
+    events:
+      - http:
+          path: todos
+          method: post
+          cors: true # Enable CORS for frontend access
+  getTodos:
+    handler: handler.getTodos
+    events:
+      - http:
+          path: todos
+          method: get
+          cors: true
+  getTodo:
+    handler: handler.getTodo
+    events:
+      - http:
+          path: todos/{id}
+          method: get
+          cors: true
+  updateTodo:
+    handler: handler.updateTodo
+    events:
+      - http:
+          path: todos/{id}
+          method: put
+          cors: true
+  deleteTodo:
+    handler: handler.deleteTodo
+    events:
+      - http:
+          path: todos/{id}
+          method: delete
+          cors: true
+
+resources:
+  Resources:
+    TodosTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.tableName}
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1 # Low values for cost; adjust for production
